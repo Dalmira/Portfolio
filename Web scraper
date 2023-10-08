@@ -1,0 +1,162 @@
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException
+import pandas as pd
+import numpy as np
+from selenium.webdriver.chrome.service import Service
+
+chrome_path = "C:\\Users\\jjone\\Downloads\\chromedriver"
+
+
+def kosmetikfuchs_scraper(df_test):
+    service = Service(executable_path=chrome_path)
+    service.start()
+    driver = webdriver.Remote(
+        service.service_url, desired_capabilities=webdriver.DesiredCapabilities.CHROME)
+
+    # step 2 go to every link in this dataframe
+    for i in range(len(df_test)):
+        url = df_test.URL[i]
+        driver.get(url)
+        time.sleep(2)
+
+        # click on accept essential cookies if the window will show up
+        try:
+            xpath1 = "/html/body/div[4]/div/div/div[1]/div[3]/button[3]"
+            btn = driver.find_element(By.XPATH, xpath1)
+            btn.click()
+            time.sleep(5)
+        except:
+            pass
+        # if the product is available online click close on the popped up window message
+        try:
+            not_online = '/html/body/div[4]/div/div/div[1]/button'
+            not_online_btn = driver.find_element(By.XPATH, not_online)
+            not_online_btn.click()
+        except:
+            pass
+
+        try:
+            # find the elements
+            brands = driver.find_element(
+                By.XPATH, '//*[@id="LazyRoute:/:language?/p/(.*)?/:productId"]/div/div[1]/div/div/div[1]/div[2]/div/div[1]/header/div/h1/div[1]/a/span').get_attribute("innerHTML")
+            df_test.brand[i] = brands
+            names = driver.find_element(By.CLASS_NAME, 'second-line ').text
+            type = driver.find_element(By.CLASS_NAME, 'third-line').text
+            volume = driver.find_element(
+                By.CLASS_NAME, 'product-detail__variant-name').text
+            prices = driver.find_element(
+                By.CLASS_NAME, 'product-price__price').text
+            price_per_l = driver.find_element(
+                By.CLASS_NAME, 'product-price__extended-content-units').text
+            image_ref = driver.find_element(
+                By.XPATH, '/html/body/div[1]/div[1]/div/div[1]/div[2]/div/div[1]/div[1]/div[1]/div[2]/div/div/div/div[1]/div/img').get_attribute("src")
+            # fill the table
+            df_test.name[i] = names
+            df_test.price[i] = prices
+            df_test.volume[i] = volume
+            df_test.price_per_l[i] = price_per_l
+            df_test.type[i] = type
+            df_test.img_ref[i] = image_ref
+        except NoSuchElementException:
+            df_test.brand[i] = 'None'
+            df_test.name[i] = 'None'
+            df_test.price[i] = 'None'
+            df_test.price_per_l[i] = 'None'
+            df_test.type[i] = 'None'
+            df_test.img_ref[i] = 'None'
+
+        try:
+            # move down to the product information, find elements and fill common column
+            ages_skin_info = driver.find_elements(
+                By.CLASS_NAME, 'classification__item')
+            driver.execute_script(
+                "arguments[0].scrollIntoView();", ages_skin_info)
+            ages_skin_info_text = [info.text for info in ages_skin_info]
+            df_test.age_skin_type_properties[i] = ages_skin_info_text
+
+            # find the element button 'ingredients' click on it and fetch the text with ingredients, fill the column in the table
+            btn = driver.find_element(
+                By.XPATH, "//ul[@class='react-tabs__tab-list']/li[text()='Inhaltsstoffe']")  # Inhaltsstoffe
+            driver.execute_script("arguments[0].scrollIntoView();", btn)
+            btn.click()
+            time.sleep(5)
+            ingredients = driver.find_elements(
+                By.CLASS_NAME, 'product-detail-other-info__html')
+            time.sleep(5)
+            ingredients_text = [ing.text for ing in ingredients]
+            df_test.ingredients[i] = ingredients_text
+        except NoSuchElementException:
+            df_test.age_skin_type_properties[i] = 'None'
+            df_test.ingredients[i] = 'None'
+
+        # replaced Nan for the further step
+        df_test = df_test.replace(np.nan, 'None')
+        # split the info in this column into several separate columns
+        age_list = df_test["age_skin_type_properties"].iloc[i]
+
+        if "Alter" in age_list:
+            age = age_list[int(age_list.index("Alter")) + 1]
+        else:
+            age = 'None'
+        df_test.at[i, "age"] = age
+
+        if "Eigenschaft" in age_list:
+            prod_properties = age_list[int(age_list.index("Eigenschaft")) + 1]
+        else:
+            prod_properties = 'None'
+        df_test.at[i, "prod_properties"] = prod_properties
+
+        if "Hauttyp" in age_list:
+            skin_type = age_list[int(age_list.index("Hauttyp")) + 1]
+        else:
+            skin_type = 'None'
+        df_test.at[i, "skin_type"] = skin_type
+
+        if "Art-Nr." in age_list:
+            Art_Nr = age_list[int(age_list.index("Art-Nr.")) + 1]
+        else:
+            Art_Nr = 'None'
+        df_test.at[i, "Art_Nr"] = Art_Nr
+
+        if "Produktauszeichnung" in age_list:
+            product_label = age_list[int(
+                age_list.index("Produktauszeichnung")) + 1]
+        else:
+            product_label = 'None'
+        df_test.at[i, "product_label"] = product_label
+
+        if "Anwendungsbereich" in age_list:
+            application = age_list[int(
+                age_list.index("Anwendungsbereich")) + 1]
+        else:
+            application = 'None'
+        df_test.at[i, "application"] = application
+
+        if "Produkttyp" in age_list:
+            package = age_list[int(age_list.index("Produkttyp"))+1]
+        else:
+            package = 'None'
+        df_test.at[i, "package"] = package
+
+        if "Konsistenz" in age_list:
+            consistency = age_list[int(age_list.index("Konsistenz"))+1]
+        else:
+            consistency = 'None'
+        df_test.at[i, "consistency"] = consistency
+
+        if "Effekt" in age_list:
+            effect = age_list[int(age_list.index("Effekt"))+1]
+        else:
+            effect = 'None'
+        df_test.at[i, "effect"] = effect
+    driver.close()
+    return df_test
+
+
+kosmetikfuchs_dataset = kosmetikfuchs_scraper(
+    df_test=pd.read_csv("kosmetikfuchs_product_links.csv"))
+kosmetikfuchs_dataset.to_csv(
+    "kosmetikfuchs_dataset.csv", sep="\t", index=False)
